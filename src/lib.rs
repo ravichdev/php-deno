@@ -1,5 +1,5 @@
 use anyhow::Error;
-use ext_php_rs::{convert::FromZval, convert::IntoZval, prelude::*, types::Zval};
+use ext_php_rs::{convert::{FromZval, IntoZval}, prelude::*, types::{ArrayKey, Zval}};
 use futures::future::FutureExt;
 use std::collections::HashMap;
 
@@ -1210,13 +1210,15 @@ pub fn js_value_from_zval<'a>(
         let mut values: Vec<v8::Local<'_, v8::Value>> = Vec::new();
         let mut keys: Vec<v8::Local<'_, v8::Name>> = Vec::new();
         let mut has_string_keys = false;
-        for (index, key, elem) in zend_array.iter() {
+        for (key, elem) in zend_array.iter() {
             let key = match key {
-                Some(key) => {
+                ArrayKey::String(key) => {
                     has_string_keys = true;
                     key
+                },
+                ArrayKey::Long(key) => {
+                    key.to_string() 
                 }
-                None => index.to_string(),
             };
             keys.push(v8::String::new(scope, key.as_str()).unwrap().into());
             values.push(js_value_from_zval(scope, elem));
