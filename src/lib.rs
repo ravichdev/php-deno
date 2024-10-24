@@ -80,7 +80,7 @@ impl MainWorker {
         local.block_on(&mut rt, async {
             match self.deno_main_worker.execute_script(name, source_code) {
                 Ok(return_value) => {
-                    let mut scope = self.deno_jsruntime.handle_scope();
+                    let mut scope = self.deno_main_worker.handle_scope();
                     let value = return_value.open(&mut scope);
                     let value_str = value
                         .to_string(&mut scope)
