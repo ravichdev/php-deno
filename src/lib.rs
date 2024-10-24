@@ -74,12 +74,20 @@ impl MainWorker {
     ///
     /// This does not support top level await for Es6 imports. use `load_main_module`
     /// to execute JavaScript in modules.
-    fn execute_script(&mut self, name: &str, source_code: &str) -> PhpResult<()> {
+    fn execute_script(&mut self, name: &str, source_code: &str) -> PhpResult<String> {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         let local = tokio::task::LocalSet::new();
         local.block_on(&mut rt, async {
             match self.deno_main_worker.execute_script(name, source_code) {
-                Ok(_) => Ok(()),
+                Ok(return_value) => {
+                    let mut scope = self.deno_jsruntime.handle_scope();
+                    let value = return_value.open(&mut scope);
+                    let value_str = value
+                        .to_string(&mut scope)
+                        .unwrap()
+                        .to_rust_string_lossy(&mut scope);
+                    Ok(String::from(value_str))
+                },
                 Err(error) => match error.downcast::<deno_core::error::JsError>() {
                     Ok(error) => {
                         Err(JsException::from(error).into())
@@ -509,7 +517,7 @@ impl JsRuntime {
     ///
     /// This does not support top level await for Es6 imports. use `load_main_module`
     /// to execute JavaScript in modules.
-    fn execute_script(&mut self, name: &str, source_code: &str) -> PhpResult<()> {
+    fn execute_script(&mut self, name: &str, source_code: &str) -> PhpResult<String> {
         if self.has_snapshotted {
             return Err("Scripts can not be executed after JsRuntime has been snapshotted.".into());
         }
@@ -517,7 +525,15 @@ impl JsRuntime {
         let local = tokio::task::LocalSet::new();
         local.block_on(&mut rt, async {
             match self.deno_jsruntime.execute_script(name, source_code) {
-                Ok(_) => Ok(()),
+                Ok(return_value) => {
+                    let mut scope = self.deno_jsruntime.handle_scope();
+                    let value = return_value.open(&mut scope);
+                    let value_str = value
+                        .to_string(&mut scope)
+                        .unwrap()
+                        .to_rust_string_lossy(&mut scope);
+                    Ok(String::from(value_str))
+                },
                 Err(error) => match error.downcast::<deno_core::error::JsError>() {
                     Ok(error) => {
                         Err(JsException::from(error).into())
